@@ -2,7 +2,7 @@ import os
 import time
 import logging
 import httpx
-from urllib.parse import urlparse, quote_plus
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from .domain_trust import get_domain_tier, DOMAIN_BLOCKLIST
 from .config import settings
@@ -27,7 +27,39 @@ def _filter_urls(urls: list) -> list:
 def _sort_by_credibility(urls: list) -> list:
     return sorted(urls, key=lambda u: get_domain_tier(urlparse(u).netloc))
 
-# --- Provider 1: Google CSE ---
+def _deduplicate_by_domain(urls: list) -> list:
+    seen_domains = {}
+    result = []
+    for url in urls:
+        domain = urlparse(url).netloc.replace("www.", "")
+        count = seen_domains.get(domain, 0)
+        if count < 2:
+            result.append(url)
+            seen_domains[domain] = count + 1
+    return result
+
+# --- Provider 1: Tavily (Best for AI/Fact-checking) ---
+def search_tavily(query: str, max_results: int = MAX_RESULTS_PER_QUERY) -> list:
+    if not TAVILY_KEY: return []
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": TAVILY_KEY,
+                    "query": query,
+                    "search_depth": "basic",
+                    "max_results": max_results
+                }
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return [r["url"] for r in data.get("results", [])]
+    except Exception as e:
+        logger.debug(f"Tavily error: {e}")
+        return []
+
+# --- Provider 2: Google CSE ---
 def search_google_cse(query: str, max_results: int = MAX_RESULTS_PER_QUERY) -> list:
     if not GOOGLE_KEY or not GOOGLE_CX: return []
     try:
@@ -42,29 +74,44 @@ def search_google_cse(query: str, max_results: int = MAX_RESULTS_PER_QUERY) -> l
         logger.debug(f"Google CSE error: {e}")
         return []
 
-# --- Provider 2: DuckDuckGo ---
+# --- Provider 3: DuckDuckGo ---
 def search_duckduckgo(query: str, max_results: int = MAX_RESULTS_PER_QUERY) -> list:
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
             return [r["href"] for r in results if "href" in r]
-    except Exception:
-        pass
-    return []
+    except Exception as e:
+        logger.debug(f"DuckDuckGo error: {e}")
+        return []
 
 # --- MAIN SEARCH ORCHESTRATOR ---
-def search_for_claim(queries: list, max_urls: int = 8, progress_callback=None) -> list:
+def search_for_claim(
+    queries: list, 
+    max_urls: int = 8, 
+    depth: str = "standard", 
+    progress_callback=None
+) -> list:
+    if depth == "quick": max_urls = min(max_urls, 3)
+    elif depth == "deep": max_urls = max(max_urls, 10)
+
     all_urls = []
     for q in queries:
         if progress_callback: progress_callback(f"  🔍 Searching: {q[:60]}...")
         
-        found = search_google_cse(q, max_urls)
+        # PRIORITIZE Tavily since you have a valid key
+        found = search_tavily(q, max_urls)
+        
+        # Fallback to Google (will fail currently due to key) then DuckDuckGo
+        if len(found) < 2: found += search_google_cse(q, max_urls)
         if len(found) < 2: found += search_duckduckgo(q, max_urls)
+        
         all_urls.extend(found)
         time.sleep(0.3)
 
     all_urls = list(dict.fromkeys(all_urls))
     all_urls = _filter_urls(all_urls)
+    all_urls = _deduplicate_by_domain(all_urls)
     all_urls = _sort_by_credibility(all_urls)
+
     return all_urls[:max_urls]

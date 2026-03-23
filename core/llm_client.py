@@ -57,16 +57,61 @@ def _call_openrouter_sync(system: str, user: str, temperature: float = 0.1) -> s
         return result
 
 def _parse_json(raw: str) -> Any:
+    """Extract JSON from LLM response, even if wrapped in markdown fences or malformed."""
     raw = raw.strip()
+    
+    # 1. Strip ```json ... ``` fences
     fenced = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", raw)
     if fenced:
-        raw = fenced.group(1)
-    start = min(
-        (raw.find("{") if raw.find("{") != -1 else len(raw)),
-        (raw.find("[") if raw.find("[") != -1 else len(raw)),
-    )
-    raw = raw[start:]
-    return json.loads(raw)
+        raw = fenced.group(1).strip()
+
+    # 2. Find the start of the JSON object or array
+    start_brace = raw.find("{")
+    start_bracket = raw.find("[")
+    
+    if start_brace == -1: start_brace = len(raw)
+    if start_bracket == -1: start_bracket = len(raw)
+    
+    start = min(start_brace, start_bracket)
+    
+    if start != len(raw):
+        raw = raw[start:]
+    else:
+        # No JSON structure found
+        return {}
+
+    # 3. Try parsing directly
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        # 4. If parsing fails, try to repair common issues (unclosed strings/brackets)
+        try:
+            # Heuristic: Close unclosed strings and brackets
+            # This is a simple repair mechanism for "Unterminated string" errors
+            repaired = raw
+            
+            # Check for unclosed quotes (very basic check)
+            # If we have an odd number of quotes, we might have an unclosed string
+            # This is complex to fix perfectly, so we try a simpler bracket fix first.
+            
+            # Count open/close brackets
+            open_braces = repaired.count("{") - repaired.count("}")
+            open_brackets = repaired.count("[") - repaired.count("]")
+            
+            # Append missing closing brackets
+            # Note: This assumes closing order is correct, which is usually ] then }
+            if open_brackets > 0:
+                repaired += "]" * open_brackets
+            if open_braces > 0:
+                repaired += "}" * open_braces
+                
+            # Try parsing again
+            return json.loads(repaired)
+            
+        except json.JSONDecodeError:
+            # If repair fails, return empty dict to prevent pipeline crash
+            print(f"Warning: Failed to parse JSON. Raw output: {raw[:200]}...")
+            return {}
 
 # --- STAGE 1: Claim Extraction ---
 CLAIM_EXTRACTION_SYSTEM = """You are an elite fact-extraction engine trained by investigative journalists and logicians.
@@ -150,7 +195,15 @@ def generate_search_queries(claim_text: str) -> dict:
         f'Generate search queries for this claim: "{claim_text}"',
         temperature=0.2,
     )
-    return _parse_json(raw)
+    try:
+        result = _parse_json(raw)
+        # Ensure keys exist
+        if "queries" not in result:
+            result["queries"] = [claim_text]
+        return result
+    except Exception:
+        # Fallback if parsing fails completely
+        return {"queries": [claim_text]}
 
 # --- STAGE 3: Verdict Generation ---
 VERDICT_SYSTEM = """You are a rigorous, evidence-only fact-checking AI. You have ZERO access to external knowledge beyond what is provided as evidence. You MUST NOT use any information from your training data.

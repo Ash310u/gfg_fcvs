@@ -1,10 +1,8 @@
 import sys, os
-# Ensure core package can be found
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 import json
-import asyncio
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -25,6 +23,8 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif !important; }
 .fc-hero span { color: #3b82f6; }
 .fc-subtitle { font-family: 'IBM Plex Mono', monospace; font-size: 1rem; color: #64748b; margin-bottom: 2rem; }
 .terminal-box { background: #020408; border: 1px solid #1e2d4a; border-radius: 8px; padding: 1rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: #22c55e; max-height: 250px; overflow-y: auto; line-height: 1.7; }
+.source-link { color: #60a5fa; text-decoration: none; font-size: 0.85rem; }
+.source-link:hover { text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -33,12 +33,16 @@ if "session_result" not in st.session_state:
     st.session_state.session_result = None
 if "pipeline_log" not in st.session_state:
     st.session_state.pipeline_log = []
-if "history" not in st.session_state:
-    # Load from local storage if available
-    try:
-        from core.storage import load_history
+if "stop_requested" not in st.session_state:
+    st.session_state.stop_requested = False
+
+# Load history
+try:
+    from core.storage import load_history
+    if "history" not in st.session_state:
         st.session_state.history = load_history()
-    except ImportError:
+except ImportError:
+    if "history" not in st.session_state:
         st.session_state.history = []
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -81,7 +85,10 @@ with st.expander("⚙️ Advanced Settings", expanded=False):
     with adv_col2:
         max_claims = st.slider("Max Claims to Extract", 5, 50, 20)
         sources_per_claim = st.slider("Sources per Claim", 3, 10, 5)
-        min_source_quality = st.selectbox("Minimum Source Quality", [1, 2, 3, 4], index=2, format_func=lambda x: f"Tier {x}")
+        min_source_quality = st.selectbox(
+            "Minimum Source Quality", [1, 2, 3, 4], index=1,
+            format_func=lambda x: {1: "🟢 Tier 1 Only (Gov, Academic)", 2: "🔵 Tier 1+2 (+ Major News)", 3: "🟡 Tier 1-3 (+ Blogs)", 4: "⚪ All Sources"}[x]
+        )
 
 # ── Verify Button ─────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -94,13 +101,14 @@ with col_btn:
 # ── Pipeline Execution ────────────────────────────────────────────────────────
 if verify_clicked and has_input:
     from core.pipeline import run_pipeline
-    # Import storage only if needed
     try:
         from core.storage import save_history
         use_persistent_storage = True
     except ImportError:
         use_persistent_storage = False
 
+    # Reset stop flag at start
+    st.session_state.stop_requested = False
     st.session_state.pipeline_log = []
     log_messages = []
 
@@ -113,10 +121,13 @@ if verify_clicked and has_input:
         ("stage_06", "STAGE 06: Report Assembly"),
         ("stage_07", "STAGE 07: AI Content Detection"),
     ]
-    stage_status = {s[0]: "pending" for s in STAGES}
-
+    
     st.markdown("---")
     st.markdown("### 🔄 Live Pipeline")
+    
+    # Create a placeholder for the stop button right under the header
+    stop_placeholder = st.empty()
+    
     progress_bar = st.progress(0)
     status_text  = st.empty()
     stage_display = st.empty()
@@ -132,11 +143,9 @@ if verify_clicked and has_input:
         stage_display.markdown(f'<div class="fc-card">{rows}</div>', unsafe_allow_html=True)
 
     done_stages = set()
-    current_stage_ref = ["stage_01"]
 
     def progress_callback(stage: str, message: str, pct: int):
         if stage != "complete":
-            current_stage_ref[0] = stage
             if stage not in done_stages and pct > 0:
                 prev_idx = [s[0] for s in STAGES].index(stage) if stage in [s[0] for s in STAGES] else -1
                 if prev_idx > 0: done_stages.add(STAGES[prev_idx - 1][0])
@@ -148,8 +157,17 @@ if verify_clicked and has_input:
         st.session_state.pipeline_log = log_messages.copy()
         log_display.markdown('<div class="terminal-box">' + "<br>".join(f"<span style='color:#64748b'>[{i}]</span> {m}" for i, m in enumerate(log_messages[-12:])) + "</div>", unsafe_allow_html=True)
 
-    # --- CORRECTED TRY/EXCEPT BLOCK ---
+    # Define stop check function
+    def should_stop():
+        return st.session_state.stop_requested
+
     try:
+        # Show Stop Button
+        with stop_placeholder.container():
+            if st.button("🛑 STOP ANALYSIS", key="stop_btn_active", use_container_width=True):
+                st.session_state.stop_requested = True
+                st.warning("Attempting to stop pipeline... please wait for current step to finish.")
+
         with st.spinner("Running verification pipeline..."):
             result = run_pipeline(
                 input_text=input_text, 
@@ -159,12 +177,19 @@ if verify_clicked and has_input:
                 depth=depth, 
                 sources_per_claim=sources_per_claim,
                 min_source_quality=min_source_quality, 
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                stop_check=should_stop  # Pass stop check
             )
 
+        # Clear stop button
+        stop_placeholder.empty()
+
+        # Check if stopped
+        if st.session_state.stop_requested:
+            st.error("⚠️ Analysis was stopped by user.")
+        
         # Mark all done
-        for s in STAGES: 
-            done_stages.add(s[0])
+        for s in STAGES: done_stages.add(s[0])
         render_stages("complete", done_stages)
         progress_bar.progress(1.0)
 
@@ -172,7 +197,6 @@ if verify_clicked and has_input:
         st.session_state.session_result = result
         st.session_state.history.append(result)
         
-        # Save to local file if available
         if use_persistent_storage:
             save_history(st.session_state.history)
 
@@ -187,6 +211,27 @@ if verify_clicked and has_input:
         with qr_col3: st.metric("TRUE Claims", result["verdict_counts"].get("TRUE", 0))
         with qr_col4: st.metric("FALSE Claims", result["verdict_counts"].get("FALSE", 0))
         
+        # --- NEW: Relevant Sources Section ---
+        st.markdown("### 📚 Relevant Sources Consulted")
+        st.caption("Click links to verify sources manually. Sources are grouped by the claim they support.")
+        
+        if result.get("claims"):
+            for claim in result["claims"]:
+                evidence = claim.get("evidence", [])
+                if evidence:
+                    with st.expander(f"**Claim:** {claim.get('text', '')[:80]}...", expanded=False):
+                        st.markdown(f"**Verdict:** `{claim.get('verdict', 'N/A')}`")
+                        for ev in evidence:
+                            tier = ev.get("domain_tier", 4)
+                            tier_icon = {1: "🟢", 2: "🔵", 3: "🟡", 4: "⚪"}.get(tier, "⚪")
+                            st.markdown(
+                                f'<div style="margin-bottom:5px;">{tier_icon} <a href="{ev.get("url")}" target="_blank" class="source-link">{ev.get("domain")}</a> <span style="color:#64748b;font-size:0.8rem;">({ev.get("method")})</span></div>',
+                                unsafe_allow_html=True
+                            )
+        else:
+            st.info("No sources were retrieved for this analysis.")
+            
+        st.markdown("---")
         st.info("📊 View the full interactive report → **Report** page in the sidebar")
         
         if st.button("🔄 NEW CHECK"):
