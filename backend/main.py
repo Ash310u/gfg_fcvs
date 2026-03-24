@@ -34,6 +34,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
+    "https://gfgfcvs.vercel.app",
+    "https://gfgfcvs.vercel.app/",
 ]
 
 # Also allow any *.vercel.app origin via environment variable
@@ -259,4 +261,8 @@ async def stop_pipeline(session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        "backend.main:app",
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8000)),
+    )
