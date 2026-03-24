@@ -1,4 +1,4 @@
-# 🛡️ FactCheck Engine
+# LumenAI
 
 ### **Every Claim. Verified.**
 
@@ -11,25 +11,25 @@ An AI-driven fact-checking engine designed to combat misinformation and LLM hall
 
 ---
 
-## 📖 Table of Contents
-- [Problem Statement](#-problem-statement)
-- [Key Features](#-key-features)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [Usage](#-usage)
-- [Evaluation Criteria Alignment](#-evaluation-criteria-alignment)
-- [Future Roadmap](#-future-roadmap)
+## Table of Contents
+- [Problem Statement](#problem-statement)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Evaluation Criteria Alignment](#evaluation-criteria-alignment)
+- [Future Roadmap](#future-roadmap)
 
 ---
 
-## 🎯 Problem Statement
+## Problem Statement
 The rapid proliferation of AI-generated content has led to a surge in misinformation. Manually fact-checking dense documents is unscalable. This engine automates the verification process by decomposing text into atomic claims, retrieving real-world evidence, and generating verifiable verdicts with confidence scores.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 ### 1. Multi-Stage Verification Pipeline
 A transparent 7-stage pipeline that provides real-time feedback to the user:
@@ -58,7 +58,7 @@ To ensure robust evidence retrieval, the system uses a tiered scraping approach:
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 | :--- | :--- |
@@ -71,7 +71,7 @@ To ensure robust evidence retrieval, the system uses a tiered scraping approach:
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -95,7 +95,7 @@ graph TD
 
 ---
 
-## 🚀 Installation
+## Installation
 
 Follow these steps to set up the project locally.
 
@@ -107,8 +107,8 @@ Follow these steps to set up the project locally.
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/your-username/fact-check-engine.git
-   cd fact-check-engine
+   git clone https://github.com/your-username/gfg_fcvs.git
+   cd gfg_fcvs
    ```
 
 2. **Create a Virtual Environment**
@@ -133,7 +133,7 @@ Follow these steps to set up the project locally.
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Create a `.env` file in the root directory of the project. Copy the contents below and replace the placeholders with your actual keys.
 
@@ -163,7 +163,7 @@ SERPAPI_KEY=your-key
 
 ---
 
-## 💻 Usage
+## Usage
 
 1. **Run the Streamlit App**
    ```bash
@@ -182,51 +182,57 @@ SERPAPI_KEY=your-key
 
 ---
 
-## 📊 Evaluation Criteria Alignment
+## Evaluation Criteria Alignment
 
 | Criteria | Weight | Implementation Strategy |
 | :--- | :--- | :--- |
 | **Accuracy** | 40% | RAG implementation ensures precise context; Multi-source scraping ensures evidence availability; Self-reflection prompts reduce hallucinations. |
-| **Aesthetics** | 30% | "Forensic Intelligence Terminal" dark theme; Live streaming logs; Interactive Plotly charts; Custom CSS cards for claims. |
+| **Aesthetics** | 30% | LumenAI modern light theme; Live streaming logs; Interactive Plotly charts; Custom CSS cards for claims. |
 | **Innovation** | 30% | Waterfall scraping architecture (BS4->Scrapling); Local vector search (FAISS); Domain credibility weighting. |
 | **Bonus** | +10 | AI-Generated Text Detection implemented using linguistic features and LLM analysis. |
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
-fact-check-engine/
+gfg_fcvs/
 │
-├── .env                    # API Keys and Config
-├── requirements.txt        # Python dependencies
-├── README.md               # You are here
-│
-├── core/                   # Backend Logic Library
-│   ├── __init__.py
-│   ├── config.py           # Settings loader
-│   ├── pipeline.py         # Main orchestrator
-│   ├── llm_client.py       # LLM API calls & Prompts
-│   ├── rag_engine.py       # Vector search & Chunking
+├── core/                   # Backend Logic Library (Data Processing & AI)
+│   ├── ai_detector.py      # AI content probability analysis
+│   ├── config.py           # Environment & Settings loader
+│   ├── domain_trust.py     # Source credibility scoring
+│   ├── llm_client.py       # OpenRouter & Prompt engineering
+│   ├── pipeline.py         # 7-stage orchestrator
 │   ├── scraper.py          # Waterfall scraping logic
-│   ├── search_service.py   # Google/DDG search
-│   ├── domain_trust.py     # Credibility scoring
-│   ├── ai_detector.py      # AI text detection
+│   ├── search_service.py   # Google CSE & Tavily integration
 │   └── storage.py          # Local JSON persistence
 │
-├── frontend/               # Streamlit App
-│   ├── Home.py             # Main Entry Point
-│   └── pages/
-│       ├── 1_Pipeline.py   # Live Monitor
-│       ├── 2_Report.py     # Results Dashboard
-│       └── 3_History.py    # Session Archive
+├── frontend/               # Streamlit Dashboard (Main UI)
+│   ├── Home.py             # Landing page & Pipeline monitor
+│   ├── style.css           # Custom LumenAI branding (Coral/Cream)
+│   ├── utils.py            # UI helper functions
+│   └── pages/              # Multi-page application structure
+│       ├── 1_Pipeline.py
+│       ├── 2_Report.py
+│       └── 3_History.py
 │
-└── history.json            # Local database (auto-generated)
+├── backend/                # FastAPI Production Server
+│   └── main.py             # API endpoints for core logic
+│
+├── frontend-react/         # Modern React Frontend (Vite + Tailwind)
+│   ├── src/                # Component-based architecture
+│   └── package.json        # Dependencies & Scripts
+│
+├── .env                    # API Keys (OpenRouter, Google, etc.)
+├── requirements.txt        # Python dependencies
+├── history.json            # Local persistent data
+└── README.md               # Documentation
 ```
 
 ---
 
-## 🔮 Future Roadmap
+## Future Roadmap
 
 - [ ] **Media Detection:** Integrate AI image detection (Deepfakes).
 - [ ] **Browser Extension:** Right-click to verify any text on a webpage.
@@ -235,12 +241,12 @@ fact-check-engine/
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
 ---
 
 <p align="center">
-  Built with ❤️ for the AI Hackathon
+  Built for the AI Hackathon
 </p>
