@@ -210,16 +210,16 @@ export default function AppPage() {
               setPdfFile={setPdfFile}
             />
 
+            <AdvancedSettings settings={settings} setSettings={setSettings} />
+
             {/* Controls Row */}
             <div style={{
               marginTop: 28,
               display: 'flex',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               alignItems: 'center',
               gap: 16,
             }}>
-              <AdvancedSettings settings={settings} setSettings={setSettings} />
-
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 {!hasInput && (
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>

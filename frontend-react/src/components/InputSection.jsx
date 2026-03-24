@@ -45,7 +45,7 @@ export default function InputSection({
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             placeholder="Paste any text, article, or claim-rich document here..."
-            style={{ minHeight: 200 }}
+            style={{ minHeight: 120 }}
           />
           {inputText && (
             <div style={{
